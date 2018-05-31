@@ -1,0 +1,132 @@
+from reinforcment.tic_tac import Board
+import random
+import numpy as np
+
+
+class MonteCarlo:
+
+    def __init__(self, player, board):
+        self.player = player
+        self.visists = {}
+        self.wins = {}
+        self.sim_board = board
+        self.EPSILON = 0.99
+        self.EPSILON_DECAY = 0.999
+        self.EP_MIN = 0.1
+        self.total_wins = 0
+        self.total_games = 0
+
+    def backprop(self, plays, reward):
+        for play in plays:
+            if (play[0], play[1]) in self.wins:
+                self.wins[play[0], play[1]] += reward
+                self.visists[play[0], play[1]] += 1
+            else:
+                print('no in the bbbbbbbb')
+
+    def real_action(self):
+        pass
+
+    def simulation(self):
+        player = self.player
+        plays = []
+        while True:
+            if self.board.check_winner(1) or self.board.check_winner(2) or self.board.check_if_draw():
+                self.board.print_board()
+                print('\n\n')
+                if self.board.check_winner(1):
+                    reward = 1
+                    self.total_wins +=1
+                else:
+                    reward = 0
+                self.backprop(plays, reward)
+                self.board.clear_board()
+                if self.EPSILON > self.EP_MIN:
+                    self.EPSILON *= self.EPSILON_DECAY
+                self.total_games += 1
+                break
+            if player == 1:
+                action = self.choose_action(1, )
+                self.board.player_move(1, action)
+                plays.append([1, tuple(self.board.board)])
+                player = 2
+            elif player == 2:
+                legal_moves = self.board.available_actions()
+                action = random.choice(legal_moves)
+                self.board.player_move(player, action)
+                if (2, tuple(self.board.board)) not in self.wins:
+                    self.wins[2, tuple(self.board.board)] = 0
+                    self.visists[2, tuple(self.board.board)] = 0
+                plays.append([2, tuple(self.board.board)])
+                player = 1
+
+    def choose_action(self, player, board):
+        available_actions = board.available_actions()
+        vals = []
+        vis = []
+        for actions in available_actions:
+            for i, number in enumerate(board.board):  # resets the sim board to whatever the original board was
+                self.sim_board.board[i] = number
+            self.sim_board.player_move(player, actions)  # takes the move on the sim board, see what the next state will be
+            new_state = tuple(self.sim_board.board)
+            if (player, new_state) in self.wins:
+                vals.append(self.wins[(player, new_state)])  # number of wins in each state, the value of the state you are in
+                vis.append(self.visists[(player, new_state)])  # the number of times this state has been visited
+            else:
+                self.wins[(player, new_state)] = 0
+                self.visists[(player, new_state)] = 0
+                vals.append(0)
+                vis.append(0)
+        percents = np.zeros(len(available_actions))
+        for i in range(len(available_actions)-1):
+            percents[i] = vals[i]/(vis[i]+ 1.0e-7)
+        if random.random() > self.EPSILON:
+            actions = available_actions[np.argmax(percents)]
+        else:
+            actions = available_actions[random.randint(0, len(available_actions)-1)]
+        return actions
+
+board = Board()
+player1 = MonteCarlo(1, board)
+player2 = MonteCarlo(2, board)
+
+for i in range(1):
+    player1_action = player1.choose_action(1, board)
+    board.player_move(1, player1_action)
+    board.print_board()
+
+
+def play_game(player):
+    while True:
+        player += 1
+        available_actions = board.available_actions()
+        if available_actions:
+            print('available moves are {}'.format(str(available_actions)))
+            while True:
+                if player == 2:
+                    move = input('player {} move!'.format(player))
+                    try:
+                        if int(move) in available_actions:
+                            board.player_move(player, int(move))
+                            break
+                        else:
+                            print('not a legal move')
+                    except ValueError:
+                        print('not a number')
+                else:
+                    action = player1.choose_action(player, board)
+                    board.player_move(player, action)
+                    break
+            if board.check_winner(player):
+                print('player {} is the winner'.format(player))
+                break
+            else:
+                board.print_board()
+            player %= 2
+        else:
+            print('draw')
+            break
+
+# for i in range(20):
+#     play_game(0)
+#     player1.board.clear_board()
